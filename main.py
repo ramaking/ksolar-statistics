@@ -80,28 +80,49 @@ def generate_excel(user_id, password, search_date, progress_callback):
         percent = int((idx + 1) / len(site_info) * 100)
         progress_callback(f"발전량 수집: {percent}%")
 
+    # 날짜 리스트 준비
     date_list = sorted(date_set)
-    for idx, date in enumerate(date_list, start=2):
+    today_str = datetime.now().strftime("%Y-%m-%d").replace("-", ".")
+
+    # 1행: A열 "링크", B열 "SITE_NAME", C열~ 날짜
+    ws.cell(row=1, column=1, value="링크")
+    ws.cell(row=1, column=2, value="SITE_NAME")
+    for idx, date in enumerate(date_list, start=3):
         date_formatted = date.replace('.', '-')
         ws.cell(row=1, column=idx, value=date_formatted)
 
     green_fill = PatternFill(start_color="CCFF99", end_color="CCFF99", fill_type="solid")
-
     added_blank = False
+
     for site_name, data in result.items():
         row_idx = site_name_row.get(site_name)
+        site_code = None
+        # site_info에서 SITE_CODE 찾기
+        for s in site_info:
+            if s["SITE_NAME"] == site_name:
+                site_code = s["SITE_CODE"]
+                break
         if not row_idx:
             if not added_blank:
-                # 기존 그룹과 새 그룹 사이에 한 줄 띄우기
                 next_row += 1
                 added_blank = True
             row_idx = next_row
-            ws.cell(row=row_idx, column=1, value=site_name)
-            ws.cell(row=row_idx, column=1).fill = green_fill  # 연두색 칠하기
+            ws.cell(row=row_idx, column=2, value=site_name)
+            ws.cell(row=row_idx, column=2).fill = green_fill
             site_name_row[site_name] = row_idx
             next_row += 1
-        for col_idx, date in enumerate(date_list, start=2):
+        else:
+            ws.cell(row=row_idx, column=2, value=site_name)
+        # A열에 하이퍼링크 삽입
+        if site_code:
+            url = f"http://iplug.dasstech.com/monitoring/dataSearch/netgenerationstats?SITE_CODE={site_code}&SEARCH_DATE={today_str}&CALC_PRICE=&SEARCH_UNIT=month"
+            ws.cell(row=row_idx, column=1).hyperlink = url
+            ws.cell(row=row_idx, column=1).value = "링크"
+            ws.cell(row=row_idx, column=1).style = "Hyperlink"
+        # 날짜별 발전량
+        for col_idx, date in enumerate(date_list, start=3):
             ws.cell(row=row_idx, column=col_idx, value=data.get(date, ""))
+
 
     base = "generation_stats"
     ext = ".xlsx"

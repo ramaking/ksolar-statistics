@@ -3,15 +3,13 @@ from tkinter import messagebox
 from datetime import datetime
 import threading
 
-# 기존 크롤링 및 엑셀 생성 함수 (필요한 인자만 받도록 수정)
-def generate_excel(user_id, password, search_date):
+def generate_excel(user_id, password, search_date, progress_callback):
     import requests
     from bs4 import BeautifulSoup
     import openpyxl
     import re
     import os
 
-    # 1. 구분.txt 읽어서 A열 데이터 준비
     with open("구분.txt", encoding="utf-8") as f:
         site_names = [line.strip() for line in f if line.strip()]
 
@@ -41,7 +39,8 @@ def generate_excel(user_id, password, search_date):
         return name.replace(" ", "")
 
     site_info = []
-    for page in range(1, 15):
+    total_pages = 14
+    for page in range(1, total_pages + 1):
         url = f"http://iplug.dasstech.com/monitoring/getProjectList.json?currentPage={page}"
         res = session.get(url)
         data = res.json()
@@ -52,12 +51,15 @@ def generate_excel(user_id, password, search_date):
                 "SITE_CODE": proj["SITE_CODE"],
                 "SITE_NAME": cleaned
             })
+        # 진행률 업데이트 (페이지 기준)
+        percent = int(page / total_pages * 100)
+        progress_callback(f"프로젝트 목록 수집: {percent}%")
 
     search_unit = "month"
     date_set = set()
     result = {}
 
-    for site in site_info:
+    for idx, site in enumerate(site_info):
         site_code = site["SITE_CODE"]
         site_name = site["SITE_NAME"]
         url = f"http://iplug.dasstech.com/monitoring/dataSearch/netgenerationstats?SITE_CODE={site_code}&SEARCH_DATE={search_date}&CALC_PRICE=&SEARCH_UNIT={search_unit}"
@@ -73,14 +75,22 @@ def generate_excel(user_id, password, search_date):
                 gen = cols[1].get_text(strip=True)
                 result[site_name][date] = gen
                 date_set.add(date)
+        # 진행률 업데이트 (사이트별)
+        percent = int((idx + 1) / len(site_info) * 100)
+        progress_callback(f"발전량 수집: {percent}%")
 
     date_list = sorted(date_set)
     for idx, date in enumerate(date_list, start=2):
         ws.cell(row=1, column=idx, value=date)
 
+    added_blank = False
     for site_name, data in result.items():
         row_idx = site_name_row.get(site_name)
         if not row_idx:
+            if not added_blank:
+                # 기존 그룹과 새 그룹 사이에 한 줄 띄우기
+                next_row += 1
+                added_blank = True
             row_idx = next_row
             ws.cell(row=row_idx, column=1, value=site_name)
             site_name_row[site_name] = row_idx
@@ -99,18 +109,23 @@ def generate_excel(user_id, password, search_date):
     wb.save(filename)
     return filename
 
-# GUI 코드
 def run_gui():
     def on_generate():
         user_id = entry_id.get()
         password = entry_pw.get()
         search_date = entry_date.get()
         btn["state"] = "disabled"
+        progress_label["text"] = "진행중..."
         def task():
             try:
-                filename = generate_excel(user_id, password, search_date)
+                filename = generate_excel(
+                    user_id, password, search_date,
+                    lambda msg: progress_label.after(0, progress_label.config, {"text": msg})
+                )
+                progress_label.after(0, progress_label.config, {"text": "완료!"})
                 messagebox.showinfo("완료", f"엑셀 저장 완료: {filename}")
             except Exception as e:
+                progress_label.after(0, progress_label.config, {"text": "오류 발생"})
                 messagebox.showerror("오류", str(e))
             finally:
                 btn["state"] = "normal"
@@ -118,7 +133,7 @@ def run_gui():
 
     root = tk.Tk()
     root.title("발전량 엑셀 생성기")
-    root.geometry("350x180")
+    root.geometry("350x260")
 
     tk.Label(root, text="아이디:").grid(row=0, column=0, padx=10, pady=10, sticky="e")
     entry_id = tk.Entry(root)
@@ -135,7 +150,10 @@ def run_gui():
     entry_date.grid(row=2, column=1, padx=10, pady=10)
 
     btn = tk.Button(root, text="엑셀 생성", command=on_generate)
-    btn.grid(row=3, column=0, columnspan=2, pady=20)
+    btn.grid(row=3, column=0, columnspan=2, pady=10)
+
+    progress_label = tk.Label(root, text="")
+    progress_label.grid(row=4, column=0, columnspan=2, pady=5)
 
     root.mainloop()
 

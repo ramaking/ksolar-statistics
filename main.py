@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
 import threading
+from openpyxl.styles import PatternFill
 
 def generate_excel(user_id, password, search_date, progress_callback):
     import requests
@@ -10,7 +11,7 @@ def generate_excel(user_id, password, search_date, progress_callback):
     import re
     import os
 
-    with open("구분.txt", encoding="utf-8") as f:
+    with open("발전소이름.txt", encoding="utf-8") as f:
         site_names = [line.strip() for line in f if line.strip()]
 
     wb = openpyxl.Workbook()
@@ -81,7 +82,10 @@ def generate_excel(user_id, password, search_date, progress_callback):
 
     date_list = sorted(date_set)
     for idx, date in enumerate(date_list, start=2):
-        ws.cell(row=1, column=idx, value=date)
+        date_formatted = date.replace('.', '-')
+        ws.cell(row=1, column=idx, value=date_formatted)
+
+    green_fill = PatternFill(start_color="CCFF99", end_color="CCFF99", fill_type="solid")
 
     added_blank = False
     for site_name, data in result.items():
@@ -93,6 +97,7 @@ def generate_excel(user_id, password, search_date, progress_callback):
                 added_blank = True
             row_idx = next_row
             ws.cell(row=row_idx, column=1, value=site_name)
+            ws.cell(row=row_idx, column=1).fill = green_fill  # 연두색 칠하기
             site_name_row[site_name] = row_idx
             next_row += 1
         for col_idx, date in enumerate(date_list, start=2):

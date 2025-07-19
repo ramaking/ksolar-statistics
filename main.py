@@ -18,7 +18,7 @@ def generate_excel(user_id, password, search_date, progress_callback):
     ws = wb.active
     ws.title = "발전량 통계"
     for idx, name in enumerate(site_names, start=2):
-        ws.cell(row=idx, column=1, value=name)
+        ws.cell(row=idx, column=2, value=name)
     site_name_row = {name: idx for idx, name in enumerate(site_names, start=2)}
     next_row = len(site_names) + 2
 

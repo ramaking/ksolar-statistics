@@ -11,8 +11,12 @@ def generate_excel(user_id, password, search_date, progress_callback):
     import re
     import os
 
+    # 제외 목록 읽기
+    with open("제외목록.txt", encoding="utf-8") as f:
+        exclude_names = set(line.strip() for line in f if line.strip())
+
     with open("발전소이름.txt", encoding="utf-8") as f:
-        site_names = [line.strip() for line in f if line.strip()]
+        site_names = [line.strip() for line in f if line.strip() and line.strip() not in exclude_names]
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -48,6 +52,9 @@ def generate_excel(user_id, password, search_date, progress_callback):
         for proj in data.get("list", []):
             raw_name = proj["SITE_NAME"]
             cleaned = clean_name(raw_name)
+            # 제외목록에 있으면 추가하지 않음
+            if cleaned in exclude_names:
+                continue
             site_info.append({
                 "SITE_CODE": proj["SITE_CODE"],
                 "SITE_NAME": cleaned
